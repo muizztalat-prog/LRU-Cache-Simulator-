@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LRU Cache Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #0f0f1a;
+    --bg3: #141424;
+    --panel: #12121e;
+    --border: #1e1e35;
+    --border2: #2a2a45;
+    --accent: #00e5ff;
+    --accent2: #7c3aed;
+    --hit: #00e676;
+    --miss: #ff5252;
+    --text: #e8e8f0;
+    --text2: #8888aa;
+    --text3: #4a4a6a;
+    --glow: 0 0 20px rgba(0,229,255,0.15);
+    --glow-hit: 0 0 20px rgba(0,230,118,0.3);
+    --glow-miss: 0 0 20px rgba(255,82,82,0.3);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* animated grid bg */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+  /* HEADER */
+  header { margin-bottom: 3rem; }
+  .header-tag {
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    opacity: 0;
+    animation: fadeUp 0.5s 0.1s forwards;
+  }
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    opacity: 0;
+    animation: fadeUp 0.5s 0.2s forwards;
+  }
+  h1 span { color: var(--accent); }
+  .header-sub {
+    font-size: 13px;
+    color: var(--text2);
+    margin-top: 0.75rem;
+    opacity: 0;
+    animation: fadeUp 0.5s 0.3s forwards;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* PANELS */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+    opacity: 0;
+    animation: fadeUp 0.5s forwards;
+  }
+  .panel:nth-child(1) { animation-delay: 0.4s; }
+  .panel:nth-child(2) { animation-delay: 0.5s; }
+  .panel:nth-child(3) { animation-delay: 0.6s; }
+  .panel:nth-child(4) { animation-delay: 0.7s; }
+  .panel:nth-child(5) { animation-delay: 0.8s; }
+
+  .panel-label {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* CONFIG */
+  .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: var(--text2);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  input[type="number"], input[type="text"] {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,229,255,0.1);
+  }
+
+  /* PRESETS */
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; }
+  .preset-btn {
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.05em;
+  }
+  .preset-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 12px rgba(0,229,255,0.1);
+  }
+
+  /* BUTTONS */
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+  .btn-run {
+    background: var(--accent);
+    color: #000;
+    box-shadow: 0 0 20px rgba(0,229,255,0.3);
+  }
+  .btn-run:hover { box-shadow: 0 0 30px rgba(0,229,255,0.5); transform: translateY(-1px); }
+  .btn-step {
+    background: transparent;
+    border: 1px solid var(--accent2);
+    color: #a78bfa;
+    box-shadow: 0 0 12px rgba(124,58,237,0.15);
+  }
+  .btn-step:hover { background: rgba(124,58,237,0.1); transform: translateY(-1px); }
+  .btn-reset {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--text2);
+  }
+  .btn-reset:hover { border-color: var(--miss); color: var(--miss); }
+
+  /* ERROR */
+  .error {
+    background: rgba(255,82,82,0.1);
+    border: 1px solid rgba(255,82,82,0.3);
+    border-radius: 8px;
+    color: var(--miss);
+    font-size: 12px;
+    padding: 10px 14px;
+    margin-bottom: 1rem;
+    display: none;
+  }
+
+  /* CACHE VISUALIZATION */
+  .cache-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .cache-arrow {
+    color: var(--text3);
+    font-size: 18px;
+    margin: 0 2px;
+  }
+  .slot-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .slot-tag {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+  }
+  .slot-tag.lru { color: var(--miss); opacity: 0.7; }
+  .slot-tag.mru { color: var(--hit); opacity: 0.9; }
+
+  .slot {
+    width: 60px; height: 60px;
+    border-radius: 10px;
+    border: 1px solid var(--border2);
+    background: var(--bg3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text3);
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    position: relative;
+  }
+  .slot.occupied {
+    color: var(--text);
+    border-color: var(--border2);
+    background: var(--bg2);
+  }
+  .slot.hit {
+    color: var(--hit);
+    border-color: var(--hit);
+    background: rgba(0,230,118,0.08);
+    box-shadow: var(--glow-hit);
+    transform: scale(1.08);
+  }
+  .slot.miss-new {
+    color: var(--miss);
+    border-color: var(--miss);
+    background: rgba(255,82,82,0.08);
+    box-shadow: var(--glow-miss);
+    transform: scale(1.08);
+  }
+
+  /* STATS */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    text-align: center;
+  }
+  .stat-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+  }
+  .stat-value.hit-v { color: var(--hit); text-shadow: 0 0 20px rgba(0,230,118,0.4); }
+  .stat-value.miss-v { color: var(--miss); text-shadow: 0 0 20px rgba(255,82,82,0.4); }
+  .stat-value.rate-v { color: var(--accent); text-shadow: 0 0 20px rgba(0,229,255,0.4); }
+
+  /* LOG */
+  .log-table-wrap {
+    max-height: 280px;
+    overflow-y: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .log-table-wrap::-webkit-scrollbar { width: 4px; }
+  .log-table-wrap::-webkit-scrollbar-track { background: transparent; }
+  .log-table-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead { position: sticky; top: 0; background: var(--bg3); z-index: 1; }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text2);
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+  }
+  td { padding: 9px 14px; border-bottom: 1px solid var(--border); color: var(--text2); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr.current td { background: rgba(0,229,255,0.04); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .badge-hit { background: rgba(0,230,118,0.15); color: var(--hit); border: 1px solid rgba(0,230,118,0.3); }
+  .badge-miss { background: rgba(255,82,82,0.15); color: var(--miss); border: 1px solid rgba(255,82,82,0.3); }
+
+  .addr-cell { color: var(--accent); font-weight: 700; font-size: 14px; }
+  .step-cell { color: var(--text3); }
+  .cache-cell { color: var(--text2); font-size: 11px; }
+  .evict-cell { color: var(--miss); font-size: 11px; }
+
+  .empty-state {
+    text-align: center;
+    padding: 2.5rem;
+    color: var(--text3);
+    font-size: 12px;
+    letter-spacing: 0.05em;
+  }
+
+  /* progress bar */
+  .progress-wrap {
+    height: 2px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.3s;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  .panel-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  .log-counter { font-size: 11px; color: var(--text3); }
+
+  @media (max-width: 600px) {
+    .config-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .slot { width: 48px; height: 48px; font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="header-tag">// memory management visualization</div>
+    <h1>LRU Cache<br><span>Simulator</span></h1>
+    <p class="header-sub">Least Recently Used · Interactive Step-Through · Built in C++</p>
+  </header>
+
+  <!-- CONFIG -->
+  <div class="panel">
+    <div class="panel-label">configuration</div>
+    <div class="config-grid" style="margin-bottom: 1rem;">
+      <div class="field">
+        <label>Cache size (slots)</label>
+        <input type="number" id="cacheSize" value="3" min="1" max="20"/>
+      </div>
+      <div class="field">
+        <label>Memory address sequence</label>
+        <input type="text" id="addrInput" value="1 2 3 4 1 2 5 1 2 3 4 5" placeholder="space-separated integers"/>
+      </div>
+    </div>
+    <div class="panel-label" style="margin-bottom: 0.6rem;">presets</div>
+    <div class="presets">
+      <button class="preset-btn" onclick="loadPreset('1 2 3 4 1 2 5 1 2 3 4 5', 3)">▸ classic demo</button>
+      <button class="preset-btn" onclick="loadPreset('1 2 3 1 2 3 1 2 3', 2)">▸ thrash pattern</button>
+      <button class="preset-btn" onclick="loadPreset('7 0 1 2 0 3 0 4 2 3 0 3 2', 4)">▸ textbook example</button>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="panel">
+    <div class="panel-label">controls</div>
+    <div id="error" class="error"></div>
+    <div class="btn-row">
+      <button class="btn btn-run" onclick="runSim()">▶ run full</button>
+      <button class="btn btn-step" onclick="stepSim()">→ step</button>
+      <button class="btn btn-reset" onclick="resetSim()">↺ reset</button>
+    </div>
+  </div>
+
+  <!-- CACHE STATE -->
+  <div class="panel">
+    <div class="panel-label">cache state</div>
+    <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="cache-row" id="cacheSlots"></div>
+  </div>
+
+  <!-- STATS -->
+  <div class="panel">
+    <div class="panel-label">statistics</div>
+    <div class="stats-grid">
+      <div class="stat"><div class="stat-label">accesses</div><div class="stat-value" id="s-total">0</div></div>
+      <div class="stat"><div class="stat-label">hits</div><div class="stat-value hit-v" id="s-hits">0</div></div>
+      <div class="stat"><div class="stat-label">misses</div><div class="stat-value miss-v" id="s-misses">0</div></div>
+      <div class="stat"><div class="stat-label">hit rate</div><div class="stat-value rate-v" id="s-rate">—</div></div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="panel">
+    <div class="panel-header-row">
+      <div class="panel-label" style="margin-bottom:0;">access log</div>
+      <div class="log-counter" id="logCounter"></div>
+    </div>
+    <div class="log-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>addr</th>
+            <th>result</th>
+            <th>cache state</th>
+            <th>evicted</th>
+          </tr>
+        </thead>
+        <tbody id="logBody">
+          <tr><td colspan="5" class="empty-state">// awaiting simulation...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let simState = null;
+
+function showError(msg) {
+  const el = document.getElementById('error');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+function parseInput() {
+  const size = parseInt(document.getElementById('cacheSize').value);
+  const raw = document.getElementById('addrInput').value.trim();
+  if (isNaN(size) || size < 1 || size >= 100) { showError('Cache size must be between 1 and 99.'); return null; }
+  const addrs = raw.split(/\s+/).map(Number);
+  if (addrs.some(isNaN) || addrs.length === 0) { showError('Enter space-separated integers.'); return null; }
+  if (addrs.length >= 100) { showError('Max 99 memory accesses.'); return null; }
+  showError('');
+  return { size, addrs };
+}
+
+function initSim() {
+  const inp = parseInput();
+  if (!inp) return null;
+  return { size: inp.size, addrs: inp.addrs, cache: [], step: 0, hits: 0, misses: 0, log: [], lastEvent: null };
+}
+
+function doStep(state) {
+  if (state.step >= state.addrs.length) return false;
+  const addr = state.addrs[state.step];
+  const idx = state.cache.indexOf(addr);
+  let event;
+  if (idx !== -1) {
+    state.hits++;
+    state.cache.splice(idx, 1);
+    state.cache.push(addr);
+    event = { step: state.step + 1, addr, result: 'HIT', evicted: null, cacheSnap: [...state.cache] };
+  } else {
+    state.misses++;
+    let evicted = null;
+    if (state.cache.length >= state.size) evicted = state.cache.shift();
+    state.cache.push(addr);
+    event = { step: state.step + 1, addr, result: 'MISS', evicted, cacheSnap: [...state.cache] };
+  }
+  state.log.push(event);
+  state.lastEvent = event;
+  state.step++;
+  return true;
+}
+
+function renderCache(state) {
+  const container = document.getElementById('cacheSlots');
+  container.innerHTML = '';
+  const size = state ? state.size : (parseInt(document.getElementById('cacheSize').value) || 3);
+  const cache = state ? state.cache : [];
+  const last = state ? state.lastEvent : null;
+
+  for (let i = 0; i < size; i++) {
+    const wrap = document.createElement('div');
+    wrap.className = 'slot-wrap';
+
+    const tag = document.createElement('div');
+    if (cache.length > 1 && i === 0) { tag.className = 'slot-tag lru'; tag.textContent = 'LRU'; }
+    else if (cache.length > 1 && i === cache.length - 1) { tag.className = 'slot-tag mru'; tag.textContent = 'MRU'; }
+    else { tag.className = 'slot-tag'; tag.textContent = i < cache.length ? String(i + 1) : ''; }
+    wrap.appendChild(tag);
+
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    if (i < cache.length) {
+      slot.classList.add('occupied');
+      slot.textContent = cache[i];
+      if (last && i === cache.length - 1) {
+        if (last.result === 'HIT' && cache[i] === last.addr) slot.classList.add('hit');
+        else if (last.result === 'MISS' && cache[i] === last.addr) slot.classList.add('miss-new');
+      }
+    } else {
+      slot.textContent = '·';
+    }
+    wrap.appendChild(slot);
+    container.appendChild(wrap);
+
+    if (i < size - 1) {
+      const arrow = document.createElement('span');
+      arrow.className = 'cache-arrow';
+      arrow.textContent = '›';
+      container.appendChild(arrow);
+    }
+  }
+}
+
+function renderStats(state) {
+  const total = state.hits + state.misses;
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-hits').textContent = state.hits;
+  document.getElementById('s-misses').textContent = state.misses;
+  document.getElementById('s-rate').textContent = total > 0 ? (state.hits / total * 100).toFixed(1) + '%' : '—';
+  const pct = state.addrs.length > 0 ? (state.step / state.addrs.length * 100) : 0;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('logCounter').textContent = state.step > 0 ? state.step + ' / ' + state.addrs.length + ' accesses' : '';
+}
+
+function renderLog(state) {
+  const body = document.getElementById('logBody');
+  if (state.log.length === 0) { body.innerHTML = '<tr><td colspan="5" class="empty-state">// awaiting simulation...</td></tr>'; return; }
+  body.innerHTML = '';
+  state.log.forEach((e, i) => {
+    const tr = document.createElement('tr');
+    if (i === state.log.length - 1) tr.className = 'current';
+    const cacheStr = '[' + e.cacheSnap.join(' → ') + ']';
+    const evictStr = e.evicted !== null ? e.evicted : '—';
+    tr.innerHTML = `
+      <td class="step-cell">${e.step}</td>
+      <td class="addr-cell">${e.addr}</td>
+      <td><span class="badge badge-${e.result.toLowerCase()}">${e.result}</span></td>
+      <td class="cache-cell">${cacheStr}</td>
+      <td class="evict-cell">${evictStr}</td>
+    `;
+    body.appendChild(tr);
+  });
+  body.parentElement.scrollTop = body.parentElement.scrollHeight;
+}
+
+function render(state) { renderCache(state); renderStats(state); renderLog(state); }
+
+function runSim() {
+  const s = initSim();
+  if (!s) return;
+  while (doStep(s)) {}
+  simState = s;
+  render(simState);
+}
+
+function stepSim() {
+  if (!simState) { simState = initSim(); if (!simState) return; renderCache(simState); return; }
+  if (simState.step >= simState.addrs.length) return;
+  doStep(simState);
+  render(simState);
+}
+
+function resetSim() {
+  simState = null;
+  showError('');
+  renderCache(null);
+  document.getElementById('s-total').textContent = '0';
+  document.getElementById('s-hits').textContent = '0';
+  document.getElementById('s-misses').textContent = '0';
+  document.getElementById('s-rate').textContent = '—';
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('logCounter').textContent = '';
+  document.getElementById('logBody').innerHTML = '<tr><td colspan="5" class="empty-state">// awaiting simulation...</td></tr>';
+}
+
+function loadPreset(addrs, size) {
+  document.getElementById('addrInput').value = addrs;
+  document.getElementById('cacheSize').value = size;
+  resetSim();
+}
+
+renderCache(null);
+</script>
+</body>
+</html>

@@ -69,4 +69,8 @@ The Least Recently Used (LRU) algorithm removes the item that has not been acces
 5. The least recently used item is removed when the cache is full
 
 ---
+### Live demo:
+
+https://muizztalat-prog.github.io/LRU-Cache-Simulator-/
+
 
